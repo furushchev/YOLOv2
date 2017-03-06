@@ -1,3 +1,9 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from __future__ import print_function
+from __future__ import absolute_import
+
 import numpy as np
 from chainer import Variable, gradient_check, testing
 from yolov2.functions.sum_of_squared_error import *

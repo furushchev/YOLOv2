@@ -1,3 +1,9 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from __future__ import print_function
+from __future__ import absolute_import
+
 import argparse
 import urllib.request
 
@@ -8,6 +14,6 @@ def download_image():
 
     print('Download Image From {0} ....'.format(args.url))
     image_file_path = './sample_images/sample.jpg'
-    urllib.request.urlretrieve(args.url, image_file_path)
+    request.urlretrieve(args.url, image_file_path)
 
     return image_file_path

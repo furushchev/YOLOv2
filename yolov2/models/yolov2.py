@@ -1,10 +1,16 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from __future__ import print_function
+from __future__ import absolute_import
+
 import numpy as np
-from chainer import cuda, Function, gradient_check, Variable, optimizers, serializers, utils
-from chainer import Link, Chain, ChainList
+from chainer import Variable
+from chainer import Chain
 import chainer.links as L
 import chainer.functions as F
-from yolov2.utils import *
-from yolov2.functions import *
+from yolov2.functions import reorg
+
 
 class YOLOv2(Chain):
 

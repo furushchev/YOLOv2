@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Author: Yuki Furuta <furushchev@jsk.imi.i.u-tokyo.ac.jp>
+
+from __future__ import print_function
+from __future__ import absolute_import
 
 from yolov2.utils.utils import *
+from yolov2.utils.image_generator import *

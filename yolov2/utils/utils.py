@@ -1,3 +1,9 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from __future__ import print_function
+from __future__ import absolute_import
+
 import chainer.functions as F
 import numpy as np
 import cv2
@@ -192,15 +198,16 @@ def reshape_to_yolo_size(img):
 
     min_edge = np.minimum(input_width, input_height)
     if min_edge < min_pixel:
-        input_width *= min_pixel / min_edge
-        input_height *= min_pixel / min_edge
+        output_width = input_width * min_pixel / min_edge
+        output_height = input_height * min_pixel / min_edge
     max_edge = np.maximum(input_width, input_height)
     if max_edge > max_pixel:
-        input_width *= max_pixel / max_edge
-        input_height *= max_pixel / max_edge
+        output_width = input_width * max_pixel / max_edge
+        output_height = input_height * max_pixel / max_edge
 
-    input_width = int(input_width / 32 + round(input_width % 32 / 32)) * 32
-    input_height = int(input_height / 32 + round(input_height % 32 / 32)) * 32
-    img = cv2.resize(img, (input_width, input_height))
+    output_width = int(output_width / 32 + round(output_width % 32 / 32)) * 32
+    output_height = int(output_height / 32 + round(output_height % 32 / 32)) * 32
+    print("reshape (%d, %d) -> (%d, %d)" % (input_width, input_height, output_width, output_height))
+    img = cv2.resize(img, (output_width, output_height))
 
     return img

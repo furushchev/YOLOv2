@@ -1,3 +1,9 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from __future__ import print_function
+from __future__ import absolute_import
+
 import numpy as np
 import chainer
 from chainer import cuda, Function, gradient_check, Variable, optimizers, serializers, utils
@@ -7,12 +13,11 @@ import chainer.links as L
 from chainer import training
 from chainer.training import extensions
 import argparse
-from lib.utils import *
-from lib.image_generator import *
-from yolov2 import *
+from yolov2.models import YOLOv2
 
-parser = argparse.ArgumentParser(description="指定したパスのweightsファイルを読み込み、chainerモデルへ変換する")
-parser.add_argument('file', help="オリジナルのyolov2のweightsファイルへのパスを指定")
+
+parser = argparse.ArgumentParser(description=u"指定したパスのweightsファイルを読み込み、chainerモデルへ変換する")
+parser.add_argument('file', help=u"オリジナルのyolov2のweightsファイルへのパスを指定")
 args = parser.parse_args()
 
 print("loading", args.file)

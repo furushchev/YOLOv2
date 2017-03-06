@@ -9,3 +9,6 @@ sample_images/*.jpg
 items/*
 backgrounds/*
 assets/
+yolo.weights
+*.model
+*.pyc

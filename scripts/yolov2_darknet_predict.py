@@ -1,10 +1,17 @@
-import time
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from __future__ import print_function
+from __future__ import absolute_import
+
+import argparse
 import cv2
 import numpy as np
 from chainer import serializers, Variable
 import chainer.functions as F
-import argparse
-from yolov2 import *
+from yolov2.models import YOLOv2, YOLOv2Predictor
+from yolov2.utils import reshape_to_yolo_size, Box, nms
+
 
 class CocoPredictor:
     def __init__(self):
@@ -28,6 +35,7 @@ class CocoPredictor:
         self.model = model
 
     def __call__(self, orig_img):
+        assert isinstance(orig_img, np.ndarray)
         orig_input_height, orig_input_width, _ = orig_img.shape
         #img = cv2.resize(orig_img, (640, 640))
         img = reshape_to_yolo_size(orig_img)
@@ -100,5 +108,8 @@ if __name__ == "__main__":
 
     print("save results to yolov2_result.jpg")
     cv2.imwrite("yolov2_result.jpg", orig_img)
-    cv2.imshow("w", orig_img)
-    cv2.waitKey()
+    try:
+        cv2.imshow("w", orig_img)
+    except:
+        pass
+    cv2.waitKey(5)

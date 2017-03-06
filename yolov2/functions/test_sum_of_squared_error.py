@@ -1,6 +1,6 @@
 import numpy as np
 from chainer import Variable, gradient_check, testing
-from sum_of_squared_error import *
+from yolov2.functions.sum_of_squared_error import *
 
 batch_size = 32
 n_input = 10

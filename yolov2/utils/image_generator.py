@@ -3,7 +3,7 @@ import os
 import glob
 import numpy as np
 from PIL import Image
-from lib.utils import *
+from yolov2.utils import *
 
 # src_imageの背景画像に対して、overlay_imageのalpha画像を貼り付ける。pos_xとpos_yは貼り付け時の左上の座標
 def overlay(src_image, overlay_image, pos_x, pos_y):

@@ -3,8 +3,8 @@ from chainer import cuda, Function, gradient_check, Variable, optimizers, serial
 from chainer import Link, Chain, ChainList
 import chainer.links as L
 import chainer.functions as F
-from lib.utils import *
-from lib.functions import *
+from yolov2.utils import *
+from yolov2.functions import *
 
 class YOLOv2(Chain):
 

@@ -1,0 +1,8 @@
+cffi==1.9.1
+chainer==1.21.0
+Cython==0.25.2
+imageio==2.1.2
+matplotlib==2.0.0
+numpy==1.12.0
+Pillow==4.0.0
+six==1.10.0

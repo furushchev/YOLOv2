@@ -27,7 +27,7 @@ class CocoPredictor:
         # load model
         print("loading coco model...")
         yolov2 = YOLOv2(n_classes=self.n_classes, n_boxes=self.n_boxes)
-        serializers.load_hdf5(weight_file, yolov2) # load saved model
+        # serializers.load_npz(weight_file, yolov2) # load saved model
         model = YOLOv2Predictor(yolov2)
         model.init_anchor(anchors)
         model.predictor.train = False

@@ -164,7 +164,7 @@ class ImageGenerator():
         for i in range(n_samples):
             bg = self.bgs[np.random.randint(len(self.bgs))]
             sample_image = random_sampling(bg, crop_height, crop_width)
- 
+
             ground_truths = []
             boxes = []
             for j in range(np.random.randint(n_items)+1):

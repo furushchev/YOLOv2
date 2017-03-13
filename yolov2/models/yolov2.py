@@ -309,8 +309,8 @@ class YOLOv2Predictor(Chain):
 def _make_npz(path_npz, url, model):
     path_darknet_model = download.cached_download(url)
     print('Now loading darknet weights (usually it may take few minutes)')
-    convert_darknet_model_to_npz(path_darknet_model, path_npz)
-    npz.load_npz(path_npz, model)
+    convert_darknet_model_to_npz(path_darknet_model, path_npz, model)
+    # npz.load_npz(path_npz, model)
     return model
 
 def _retrieve(name, url, model):

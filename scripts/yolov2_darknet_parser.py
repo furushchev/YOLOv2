@@ -105,4 +105,4 @@ exec(txt)
 print(i+2, offset)
 
 print("save weights file to yolov2_darknet.model")
-serializers.save_hdf5("yolov2_darknet.model", yolov2)
+serializers.save_npz("yolov2_darknet.model", yolov2)

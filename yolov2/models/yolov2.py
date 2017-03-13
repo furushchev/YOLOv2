@@ -4,12 +4,16 @@
 from __future__ import print_function
 from __future__ import absolute_import
 
+import os
 import numpy as np
+from chainer.dataset import download
+from chainer.serializers import npz
 from chainer import Variable
 from chainer import Chain
 import chainer.links as L
 import chainer.functions as F
 from yolov2.functions import reorg
+from yolov2.utils import convert_darknet_model_to_npz
 
 
 class YOLOv2(Chain):
@@ -19,7 +23,7 @@ class YOLOv2(Chain):
     - It takes (416, 416, 3) sized image as input
     """
 
-    def __init__(self, n_classes, n_boxes):
+    def __init__(self, n_classes, n_boxes, pretrained_model='auto'):
         super(YOLOv2, self).__init__(
             ##### common layers for both pretrained layers and yolov2 #####
             conv1  = L.Convolution2D(3, 32, ksize=3, stride=1, pad=1, nobias=True),
@@ -95,6 +99,16 @@ class YOLOv2(Chain):
         self.n_boxes = n_boxes
         self.n_classes = n_classes
 
+        # download pretrained weights
+        if pretrained_model == 'auto' or pretrained_model == 'coco':
+            _retrieve('yolov2_darknet_coco.npz',
+                      'http://pjreddie.com/media/files/yolo.weights',
+                      self)
+        elif pretrained_model == 'voc':
+            _retrieve('yolov2_darknet_voc.npz',
+                      'http://pjreddie.com/media/files/yolo-voc.weights',
+                      self)
+
     def __call__(self, x):
         ##### common layer
         h = F.leaky_relu(self.bias1(self.bn1(self.conv1(x), test=not self.train, finetune=self.finetune)), slope=0.1)
@@ -114,7 +128,7 @@ class YOLOv2(Chain):
         h = F.leaky_relu(self.bias11(self.bn11(self.conv11(h), test=not self.train, finetune=self.finetune)), slope=0.1)
         h = F.leaky_relu(self.bias12(self.bn12(self.conv12(h), test=not self.train, finetune=self.finetune)), slope=0.1)
         h = F.leaky_relu(self.bias13(self.bn13(self.conv13(h), test=not self.train, finetune=self.finetune)), slope=0.1)
-        high_resolution_feature = reorg(h) # 高解像度特徴量をreorgでサイズ落として保存しておく
+        high_resolution_feature = reorg(h) # reorganization
         h = F.max_pooling_2d(h, ksize=2, stride=2, pad=0)
         h = F.leaky_relu(self.bias14(self.bn14(self.conv14(h), test=not self.train, finetune=self.finetune)), slope=0.1)
         h = F.leaky_relu(self.bias15(self.bn15(self.conv15(h), test=not self.train, finetune=self.finetune)), slope=0.1)
@@ -144,30 +158,29 @@ class YOLOv2Predictor(Chain):
         batch_size, _, grid_h, grid_w = output.shape
         self.seen += batch_size
         x, y, w, h, conf, prob = F.split_axis(F.reshape(output, (batch_size, self.predictor.n_boxes, self.predictor.n_classes+5, grid_h, grid_w)), (1, 2, 3, 4, 5), axis=2)
-        x = F.sigmoid(x) # xのactivation
-        y = F.sigmoid(y) # yのactivation
-        conf = F.sigmoid(conf) # confのactivation
+        x = F.sigmoid(x) # activation of x
+        y = F.sigmoid(y) # activation of y
+        conf = F.sigmoid(conf) # activation of conf
         prob = F.transpose(prob, (0, 2, 1, 3, 4))
-        prob = F.softmax(prob) # probablitiyのacitivation
+        prob = F.softmax(prob) # activation of prob
 
 
-        # 教師データの用意
-        tw = np.zeros(w.shape, dtype=np.float32) # wとhが0になるように学習(e^wとe^hは1に近づく -> 担当するbboxの倍率1)
+        # prepare test
+        tw = np.zeros(w.shape, dtype=np.float32)
         th = np.zeros(h.shape, dtype=np.float32)
-        tx = np.tile(0.5, x.shape).astype(np.float32) # 活性化後のxとyが0.5になるように学習()
+        tx = np.tile(0.5, x.shape).astype(np.float32)
         ty = np.tile(0.5, y.shape).astype(np.float32)
 
-        if self.seen < self.unstable_seen: # centerの存在しないbbox誤差学習スケールは基本0.1
+        if self.seen < self.unstable_seen:
             box_learning_scale = np.tile(0.1, x.shape).astype(np.float32)
         else:
             box_learning_scale = np.tile(0, x.shape).astype(np.float32)
 
-        tconf = np.zeros(conf.shape, dtype=np.float32) # confidenceのtruthは基本0、iouがthresh以上のものは学習しない、ただしobjectの存在するgridのbest_boxのみ真のIOUに近づかせる
+        tconf = np.zeros(conf.shape, dtype=np.float32)
         conf_learning_scale = np.tile(0.1, conf.shape).astype(np.float32)
 
-        tprob = prob.data.copy() # best_anchor以外は学習させない(自身との二乗和誤差 = 0)
-        
-        # 全bboxとtruthのiouを計算(batch単位で計算する)
+        tprob = prob.data.copy()
+
         x_shift = Variable(np.broadcast_to(np.arange(grid_w, dtype=np.float32), x.shape[1:]))
         y_shift = Variable(np.broadcast_to(np.arange(grid_h, dtype=np.float32).reshape(grid_h, 1), y.shape[1:]))
         w_anchor = Variable(np.broadcast_to(np.reshape(np.array(self.anchors, dtype=np.float32)[:, 0], (self.predictor.n_boxes, 1, 1, 1)), w.shape[1:]))
@@ -188,16 +201,14 @@ class YOLOv2Predictor(Chain):
                 truth_box_w = Variable(np.broadcast_to(np.array(t[batch][truth_index]["w"], dtype=np.float32), box_w.shape))
                 truth_box_h = Variable(np.broadcast_to(np.array(t[batch][truth_index]["h"], dtype=np.float32), box_h.shape))
                 truth_box_x.to_gpu(), truth_box_y.to_gpu(), truth_box_w.to_gpu(), truth_box_h.to_gpu()
-                ious.append(multi_box_iou(Box(box_x, box_y, box_w, box_h), Box(truth_box_x, truth_box_y, truth_box_w, truth_box_h)).data.get())  
+                ious.append(multi_box_iou(Box(box_x, box_y, box_w, box_h), Box(truth_box_x, truth_box_y, truth_box_w, truth_box_h)).data.get())
             ious = np.array(ious)
             best_ious.append(np.max(ious, axis=0))
         best_ious = np.array(best_ious)
 
-        # 一定以上のiouを持つanchorに対しては、confを0に下げないようにする(truthの周りのgridはconfをそのまま維持)。
         tconf[best_ious > self.thresh] = conf.data.get()[best_ious > self.thresh]
         conf_learning_scale[best_ious > self.thresh] = 0
 
-        # objectの存在するanchor boxのみ、x、y、w、h、conf、probを個別修正
         abs_anchors = self.anchors / np.array([grid_w, grid_h])
         for batch in range(batch_size):
             for truth_box in t[batch]:
@@ -211,7 +222,6 @@ class YOLOv2Predictor(Chain):
                         best_iou = iou
                         truth_n = anchor_index
 
-                # objectの存在するanchorについて、centerを0.5ではなく、真の座標に近づかせる。anchorのスケールを1ではなく真のスケールに近づかせる。学習スケールを1にする。
                 box_learning_scale[batch, truth_n, :, truth_h, truth_w] = 1.0 
                 tx[batch, truth_n, :, truth_h, truth_w] = float(truth_box["x"]) * grid_w - truth_w 
                 ty[batch, truth_n, :, truth_h, truth_w] = float(truth_box["y"]) * grid_h - truth_h
@@ -220,7 +230,6 @@ class YOLOv2Predictor(Chain):
                 tprob[batch, :, truth_n, truth_h, truth_w] = 0
                 tprob[batch, int(truth_box["label"]), truth_n, truth_h, truth_w] = 1
 
-                # IOUの観測
                 full_truth_box = Box(float(truth_box["x"]), float(truth_box["y"]), float(truth_box["w"]), float(truth_box["h"]))
                 predicted_box = Box(
                     (x[batch][truth_n][0][truth_h][truth_w].data.get() + truth_w) / grid_w, 
@@ -250,7 +259,7 @@ class YOLOv2Predictor(Chain):
             print("-------------------------------")
         print("seen = %d" % self.seen)
 
-        # loss計算
+        # compute loss
         tx, ty, tw, th, tconf, tprob = Variable(tx), Variable(ty), Variable(tw), Variable(th), Variable(tconf), Variable(tprob)
         box_learning_scale, conf_learning_scale = Variable(box_learning_scale), Variable(conf_learning_scale)
         tx.to_gpu(), ty.to_gpu(), tw.to_gpu(), th.to_gpu(), tconf.to_gpu(), tprob.to_gpu()
@@ -278,14 +287,13 @@ class YOLOv2Predictor(Chain):
         batch_size, input_channel, input_h, input_w = input_x.shape
         batch_size, _, grid_h, grid_w = output.shape
         x, y, w, h, conf, prob = F.split_axis(F.reshape(output, (batch_size, self.predictor.n_boxes, self.predictor.n_classes+5, grid_h, grid_w)), (1, 2, 3, 4, 5), axis=2)
-        x = F.sigmoid(x) # xのactivation
-        y = F.sigmoid(y) # yのactivation
-        conf = F.sigmoid(conf) # confのactivation
+        x = F.sigmoid(x)
+        y = F.sigmoid(y)
+        conf = F.sigmoid(conf)
         prob = F.transpose(prob, (0, 2, 1, 3, 4))
-        prob = F.softmax(prob) # probablitiyのacitivation
+        prob = F.softmax(prob)
         prob = F.transpose(prob, (0, 2, 1, 3, 4))
 
-        # x, y, w, hを絶対座標へ変換
         x_shift = Variable(np.broadcast_to(np.arange(grid_w, dtype=np.float32), x.shape))
         y_shift = Variable(np.broadcast_to(np.arange(grid_h, dtype=np.float32).reshape(grid_h, 1), y.shape))
         w_anchor = Variable(np.broadcast_to(np.reshape(np.array(self.anchors, dtype=np.float32)[:, 0], (self.predictor.n_boxes, 1, 1, 1)), w.shape))
@@ -297,3 +305,18 @@ class YOLOv2Predictor(Chain):
         box_h = F.exp(h) * h_anchor / grid_h
 
         return box_x, box_y, box_w, box_h, conf, prob
+
+def _make_npz(path_npz, url, model):
+    path_darknet_model = download.cached_download(url)
+    print('Now loading darknet weights (usually it may take few minutes)')
+    convert_darknet_model_to_npz(path_darknet_model, path_npz)
+    npz.load_npz(path_npz, model)
+    return model
+
+def _retrieve(name, url, model):
+    root = download.get_dataset_directory('pfnet/chainercv/models/')
+    path = os.path.join(root, name)
+    return download.cache_or_load_file(
+        path,
+        lambda path: _make_npz(path, url, model),
+        lambda path: npz.load_npz(path, model))
